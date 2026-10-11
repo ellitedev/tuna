@@ -1,0 +1,95 @@
+name: Flatpak
+run-name: Flatpak build for ${{ inputs.tag || github.ref_name }} 📦
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to build (defaults to the selected branch)
+        required: false
+        type: string
+      tag:
+        description: Release tag to attach the bundle to (leave empty to only build)
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      ref:
+        required: false
+        type: string
+      tag:
+        required: false
+        type: string
+permissions:
+  contents: write
+env:
+  APP_ID: com.obsproject.Studio.Plugin.Tuna
+jobs:
+  flatpak-build:
+    name: Build Flatpak Addon 📦
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set Up Environment 🔧
+        id: setup
+        run: |
+          : Set Up Environment 🔧
+          if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
+
+          version="$(jq -r '.version' buildspec.json)"
+          echo "version=${version}" >> $GITHUB_OUTPUT
+          echo "bundle=tuna-${version}-x86_64.flatpak" >> $GITHUB_OUTPUT
+          echo "commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+          # Make sure the version being built shows up in the addon metadata
+          metainfo="flatpak/${APP_ID}.metainfo.xml"
+          if ! grep -q "<release version=\"${version}\"" "${metainfo}"; then
+            sed -i "s|<releases>|<releases>\n    <release version=\"${version}\" date=\"$(date -u +%F)\"/>|" "${metainfo}"
+          fi
+
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          # Ubuntu 24.04 blocks the user namespaces bubblewrap needs
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Build Addon 🧱
+        run: |
+          : Build Addon 🧱
+          if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
+
+          flatpak-builder --user --install-deps-from=flathub --disable-rofiles-fuse --force-clean \
+            --state-dir="${RUNNER_TEMP}/flatpak-state" --repo="${RUNNER_TEMP}/flatpak-repo" \
+            "${RUNNER_TEMP}/flatpak-build" "flatpak/${APP_ID}.yaml"
+
+          flatpak build-bundle --runtime \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+            "${RUNNER_TEMP}/flatpak-repo" "${{ steps.setup.outputs.bundle }}" "${APP_ID}" stable
+
+      - name: Upload Bundle 📡
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.setup.outputs.bundle }}
+          path: ${{ steps.setup.outputs.bundle }}
+
+      - name: Publish Release 🛫
+        if: inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          BUNDLE: ${{ steps.setup.outputs.bundle }}
+        run: |
+          : Publish Release 🛫
+          if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
+
+          if ! gh release view "${TAG}" > /dev/null 2>&1; then
+            gh release create "${TAG}" --target "${{ steps.setup.outputs.commit }}" \
+              --title "Tuna ${TAG} (Flatpak)" \
+              --notes "Flatpak addon build of Tuna ${TAG} for the OBS Studio flatpak. Install it with \`flatpak install --user ${BUNDLE}\`."
+          fi
+          gh release upload "${TAG}" "${BUNDLE}" --clobber

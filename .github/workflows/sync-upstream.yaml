@@ -1,0 +1,67 @@
+name: Sync Upstream
+run-name: Upstream release sync 🔄
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+env:
+  UPSTREAM: univrsal/tuna
+jobs:
+  sync:
+    name: Merge Latest Upstream Release 🔄
+    if: github.repository != 'univrsal/tuna'
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check Upstream Release ☑️
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          : Check Upstream Release ☑️
+          if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
+
+          tag="$(gh api "repos/${UPSTREAM}/releases/latest" --jq '.tag_name')"
+          if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
+            echo "${tag} was already released here, nothing to do"
+          else
+            echo "tag=${tag}" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.tag != ''
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          # The default token can't push merges that touch workflow files,
+          # set a SYNC_TOKEN secret (PAT with the workflow scope) for those
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
+
+      - name: Merge Upstream Release 🔀
+        if: steps.check.outputs.tag != ''
+        run: |
+          : Merge Upstream Release 🔀
+          if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch --no-tags "https://github.com/${UPSTREAM}.git" "refs/tags/${{ steps.check.outputs.tag }}"
+          git merge --no-edit FETCH_HEAD
+          git push origin "HEAD:${{ github.event.repository.default_branch }}"
+
+  release:
+    name: Release Flatpak Addon 📦
+    needs: sync
+    if: needs.sync.outputs.tag != ''
+    uses: ./.github/workflows/flatpak.yaml
+    with:
+      ref: ${{ github.event.repository.default_branch }}
+      tag: ${{ needs.sync.outputs.tag }}
+    permissions:
+      contents: write
