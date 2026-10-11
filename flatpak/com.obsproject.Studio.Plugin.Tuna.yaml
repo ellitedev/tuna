@@ -19,6 +19,8 @@ modules:
     buildsystem: meson
     config-opts:
       - -Ddefault_library=static
+      # older flatpak-builder versions let meson pick lib64 here
+      - --libdir=lib
     sources:
       - type: git
         url: https://github.com/MusicPlayerDaemon/libmpdclient.git
