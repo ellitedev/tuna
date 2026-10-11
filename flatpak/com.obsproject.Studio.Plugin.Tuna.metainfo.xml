@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="addon">
+  <id>com.obsproject.Studio.Plugin.Tuna</id>
+  <extends>com.obsproject.Studio</extends>
+  <name>Tuna</name>
+  <summary>Song information plugin for OBS Studio</summary>
+  <description>
+    <p>Tuna fetches information about the currently playing song and makes it available in OBS Studio as text, cover art, a progress bar or a browser widget.</p>
+    <p>Supported sources include Spotify, MPD, VLC, last.fm, Icecast, window titles, web browsers through a user script and any player that implements MPRIS.</p>
+  </description>
+  <developer id="cc.vrsal">
+    <name>univrsal</name>
+  </developer>
+  <url type="homepage">https://github.com/univrsal/tuna</url>
+  <url type="bugtracker">https://github.com/univrsal/tuna/issues</url>
+  <url type="vcs-browser">https://github.com/univrsal/tuna</url>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-only</project_license>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/univrsal/tuna/master/preview.png</image>
+      <caption>Tuna showing the current song in OBS Studio</caption>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="1.9.11" date="2025-08-24"/>
+  </releases>
+</component>

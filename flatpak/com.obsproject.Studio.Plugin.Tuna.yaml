@@ -1,0 +1,51 @@
+id: com.obsproject.Studio.Plugin.Tuna
+branch: stable
+runtime: com.obsproject.Studio
+runtime-version: stable
+sdk: org.freedesktop.Sdk//25.08
+build-extension: true
+separate-locales: false
+build-options:
+  prefix: /app/plugins/Tuna
+  prepend-pkg-config-path: /app/plugins/Tuna/lib/pkgconfig
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/doc
+  - /share/vala
+  - '*.a'
+modules:
+  - name: libmpdclient
+    buildsystem: meson
+    config-opts:
+      - -Ddefault_library=static
+    sources:
+      - type: git
+        url: https://github.com/MusicPlayerDaemon/libmpdclient.git
+        tag: v2.22
+        commit: 7dd449e936a3f25d54d0a5bad798fc06e2a55aa9
+
+  - name: tuna
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - -DCMAKE_INSTALL_LIBDIR=lib
+      # taglib is pulled in through FetchContent, point it at the source below
+      - -DFETCHCONTENT_SOURCE_DIR_TAGLIB=/run/build/tuna/taglib
+    post-install:
+      - install -Dm644 ../flatpak/com.obsproject.Studio.Plugin.Tuna.metainfo.xml -t ${FLATPAK_DEST}/share/metainfo
+      # flatpak-builder doesn't split debug info for the extension prefix
+      - strip --strip-unneeded ${FLATPAK_DEST}/lib/obs-plugins/tuna.so
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - .flatpak-builder
+          - flatpak/build
+          - flatpak/repo
+      - type: git
+        url: https://github.com/taglib/taglib.git
+        tag: v2.3.1
+        commit: 54ae7d8ac45755e286a5c574280f48d5bef93aef
+        dest: taglib

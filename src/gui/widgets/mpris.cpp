@@ -22,12 +22,53 @@
 #include "../../util/constants.hpp"
 #include "../../util/utility.hpp"
 #include "ui_mpris.h"
+#include <QClipboard>
+#include <QFile>
+#include <QGuiApplication>
+
+// Inside a flatpak the session bus is filtered, so players are only reachable
+// if the sandbox was granted access to their bus names. Returns the app id if
+// we're sandboxed without that access, otherwise an empty string.
+static QString sandbox_blocking_mpris()
+{
+    QFile info("/.flatpak-info");
+    if (!info.open(QIODevice::ReadOnly | QIODevice::Text))
+        return {};
+
+    QString app_id, section;
+    while (!info.atEnd()) {
+        auto line = QString::fromUtf8(info.readLine()).trimmed();
+        if (line.startsWith('[')) {
+            section = line;
+            continue;
+        }
+        auto key = line.section('=', 0, 0);
+        auto value = line.section('=', 1);
+        if (section == "[Application]" && key == "name") {
+            app_id = value;
+        } else if (section == "[Context]" && key == "sockets") {
+            if (value.split(';').contains("session-bus"))
+                return {};
+        } else if (section == "[Session Bus Policy]" && key.startsWith("org.mpris.MediaPlayer2")) {
+            if (value == "talk" || value == "own")
+                return {};
+        }
+    }
+    return app_id;
+}
 
 mpris::mpris(QWidget* parent)
     : source_widget(parent)
     , ui(new Ui::mpris)
 {
     ui->setupUi(this);
+
+    auto app_id = sandbox_blocking_mpris();
+    ui->sandbox_hint->setVisible(!app_id.isEmpty());
+    ui->txt_sandbox_command->setText("flatpak override --user --talk-name='org.mpris.MediaPlayer2.*' " + app_id);
+    connect(ui->btn_sandbox_copy, &QPushButton::clicked, this, [this] {
+        QGuiApplication::clipboard()->setText(ui->txt_sandbox_command->text());
+    });
 }
 
 mpris::~mpris()
