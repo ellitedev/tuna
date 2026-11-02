@@ -58,6 +58,17 @@ jobs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
+          # Build against the same SDK the OBS Studio flatpak uses, so a base bump on their side doesn't break us
+          manifest="flatpak/${APP_ID}.yaml"
+          sdk="$(flatpak remote-info --user flathub com.obsproject.Studio//stable | awk '$1 == "Sdk:" { print $2 }')"
+          if [[ "${sdk}" =~ ^([^/]+)/[^/]+/(.+)$ ]]; then
+            sdk="${BASH_REMATCH[1]}//${BASH_REMATCH[2]}"
+            echo "Using ${sdk} to match OBS Studio"
+            sed -i "s|^sdk: .*|sdk: ${sdk}|" "${manifest}"
+          else
+            echo "::warning::Couldn't look up the OBS Studio SDK, using the one in ${manifest}"
+          fi
+
       - name: Build Addon 🧱
         run: |
           : Build Addon 🧱
