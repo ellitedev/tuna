@@ -38,7 +38,7 @@ modules:
     post-install:
       - install -Dm644 ../flatpak/com.obsproject.Studio.Plugin.Tuna.metainfo.xml -t ${FLATPAK_DEST}/share/metainfo
       # flatpak-builder doesn't split debug info for the extension prefix
-      - strip --strip-unneeded ${FLATPAK_DEST}/lib/obs-plugins/tuna.so
+      - find ${FLATPAK_DEST}/lib -name tuna.so -exec strip --strip-unneeded {} +
     sources:
       - type: dir
         path: ..
